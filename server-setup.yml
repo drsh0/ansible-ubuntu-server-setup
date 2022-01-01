@@ -1,0 +1,101 @@
+
+---
+- hosts: all
+
+  tasks:
+  - name: install packages
+    become: yes
+    apt:
+      state: latest
+      update_cache: yes
+      cache_valid_time: 3600
+      pkg:
+        - unattended-upgrades
+        - iftop
+        - tmux
+        - youtube-dl
+        - aria2
+        - unzip
+        - zsh
+        - update-notifier-common
+        - speedtest-cli
+
+  - name: Disable root login over SSH
+    become: yes
+    lineinfile: dest=/etc/ssh/sshd_config regexp="^PermitRootLogin" line="PermitRootLogin no" state=present
+    notify:
+      - restart sshd
+  - name: Disable password login
+    become: yes
+    lineinfile: dest=/etc/ssh/sshd_config regexp="^PasswordAuthentication" line="PasswordAuthentication no" state=present
+    notify:
+      - restart sshd
+
+  - name: Configure unattended-upgrades
+    become: yes
+    lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades regexp="^\/\/Unattended-Upgrade::Automatic-Reboot "false";" line="Unattended-Upgrade::Automatic-Reboot "false";"
+    notify:
+      - restart unanttended-upgrades
+  
+
+  - name: Check if .oh-my-zsh exists
+    stat:
+      path: ~/.oh-my-zsh
+    register: stat_oh_my_zsh_result
+
+  - name: ohmyzsh install + setup
+    shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    when: not stat_oh_my_zsh_result
+
+  - name: Set zsh as default shell
+    user: name=drsh0 shell=/usr/bin/zsh
+    become: yes
+
+
+  - name: install docker pre-req
+    become: yes
+    apt:
+      state: latest
+      pkg:
+        - ca-certificates
+        - gnupg
+        - lsb-release
+  
+  - name: check if docker gpg key is present
+    stat:
+      path: /usr/share/keyrings/docker-archive-keyring.gpg
+    register: stat_docker_gpg_result
+
+  - name: install docker gpg key
+    become: yes
+    shell: "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg"
+    when: not stat_docker_gpg_result
+  
+  - name: insert docker ce repo
+    become: yes
+    shell: 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu focal stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null'
+
+  - name: Update apt and install docker-ce
+    become: yes
+    apt:
+      update_cache: yes
+      state: latest
+      name:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+  
+  - name: install docker-compose
+    become: yes
+    shell: 'curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose'
+  
+  handlers:
+  - name: restart sshd
+    service:
+      name: sshd
+      state: restarted
+  - name: restart unanttended-upgrades
+    systemd:
+      name: unattended-upgrades
+      state: restarted
+    
