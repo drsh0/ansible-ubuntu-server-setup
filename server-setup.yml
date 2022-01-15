@@ -47,6 +47,12 @@
     shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
     when: not stat_oh_my_zsh_result
 
+  - name: add zsh plugins
+    lineinfile:
+      path: ~/.zshrc
+      regexp: '^plugins\=\('
+      line: 'plugins=(git colored-man-pages tmux extract)'
+
   - name: Set zsh as default shell
     user: name=drsh0 shell=/usr/bin/zsh
     become: yes
