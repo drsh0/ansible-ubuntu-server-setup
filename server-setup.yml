@@ -33,7 +33,7 @@
 
   - name: Configure unattended-upgrades
     become: yes
-    lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades regexp="^\/\/Unattended-Upgrade::Automatic-Reboot "false";" line="Unattended-Upgrade::Automatic-Reboot "false";"
+    lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades regexp="^\/\/Unattended-Upgrade::Automatic-Reboot "false";" line="Unattended-Upgrade::Automatic-Reboot "true";"
     notify:
       - restart unanttended-upgrades
   
@@ -42,6 +42,10 @@
     stat:
       path: ~/.oh-my-zsh
     register: stat_oh_my_zsh_result
+
+  - name: Check preference existence in .zshrc
+    shell: grep -c "^DISABLE_UPDATE_PROMPT" ~/.zshrc || true
+    register: zsh_rc_result
 
   - name: ohmyzsh install + setup
     shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
@@ -57,6 +61,11 @@
     user: name=drsh0 shell=/usr/bin/zsh
     become: yes
 
+  - name: Set Zsh preferences
+    lineinfile:
+      path: /home/drsh0/.zshrc
+      line: DISABLE_UPDATE_PROMPT="true"
+    when: zsh_rc_result.stdout == "0"
 
   - name: install docker pre-req
     become: yes
@@ -112,4 +121,3 @@
     systemd:
       name: unattended-upgrades
       state: restarted
-    
